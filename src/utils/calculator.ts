@@ -8,6 +8,14 @@ interface CalculateResult {
   summary: CalculationSummary;
 }
 
+interface ComboRawMetrics {
+  grossProfit: number;
+  profitMargin: number;
+  avgWeight: number;
+  monthlyTurnover: number;
+  stockUtilization: number;
+}
+
 export function calculateCombinations(
   products: Product[],
   constraints: Constraints
@@ -21,7 +29,21 @@ export function calculateCombinations(
 
   let filteredByStock = 0;
   let filteredByWeight = 0;
-  const validResults: ComboResult[] = [];
+
+  interface PendingResult {
+    index: number;
+    items: ComboItem[];
+    totalCost: number;
+    totalRevenue: number;
+    grossProfit: number;
+    profitMargin: number;
+    monthlyTurnover: number;
+    avgWeight: number;
+    totalStock: number;
+    rawMetrics: ComboRawMetrics;
+  }
+
+  const pendingResults: PendingResult[] = [];
 
   for (let i = 0; i < allCombos.length; i++) {
     const combo = allCombos[i];
@@ -60,21 +82,16 @@ export function calculateCombinations(
       filteredByStock++;
       continue;
     }
+    let stockExceeded = false;
     for (let j = 0; j < items.length; j++) {
       if (items[j].quantity > items[j].product.stockLimit) {
-        filteredByStock++;
+        stockExceeded = true;
         break;
       }
     }
-    if (validResults.length > 0 && validResults[validResults.length - 1].items.length === items.length) {
-      const prev = validResults[validResults.length - 1].items;
-      let isSameSet = true;
-      for (let j = 0; j < items.length; j++) {
-        if (prev[j].product.id !== items[j].product.id) { isSameSet = false; break; }
-      }
-      if (!isSameSet || prev.length !== items.length) {
-        // ok
-      }
+    if (stockExceeded) {
+      filteredByStock++;
+      continue;
     }
 
     const totalCost = items.reduce((s, it) => s + it.product.cost * it.quantity, 0);
@@ -87,27 +104,64 @@ export function calculateCombinations(
 
     const stockUtilization = globalStockLimit > 0 ? totalStock / globalStockLimit : 0.5;
 
-    const weightedScore =
-      grossProfit * 0.50 +
-      profitMargin * 100 * 0.20 +
-      avgWeight * 0.15 * 100 +
-      (monthlyTurnover / 100) * 0.10 * 100 +
-      stockUtilization * 0.05 * 1000;
-
-    validResults.push({
-      id: `combo-${i}`,
-      rank: 0,
+    pendingResults.push({
+      index: i,
       items,
-      totalCost: Math.round(totalCost * 100) / 100,
-      totalRevenue: Math.round(totalRevenue * 100) / 100,
-      grossProfit: Math.round(grossProfit * 100) / 100,
-      profitMargin: Math.round(profitMargin * 10000) / 10000,
-      weightedScore: Math.round(weightedScore * 100) / 100,
+      totalCost,
+      totalRevenue,
+      grossProfit,
+      profitMargin,
       monthlyTurnover,
-      avgTurnoverWeight: Math.round(avgWeight * 10) / 10,
+      avgWeight,
       totalStock,
+      rawMetrics: {
+        grossProfit,
+        profitMargin,
+        avgWeight,
+        monthlyTurnover,
+        stockUtilization,
+      },
     });
   }
+
+  const maxGP = Math.max(...pendingResults.map(r => r.rawMetrics.grossProfit), 1);
+  const maxPM = Math.max(...pendingResults.map(r => r.rawMetrics.profitMargin), 1);
+  const maxAW = Math.max(...pendingResults.map(r => r.rawMetrics.avgWeight), 1);
+  const maxMT = Math.max(...pendingResults.map(r => r.rawMetrics.monthlyTurnover), 1);
+  const maxSU = Math.max(...pendingResults.map(r => r.rawMetrics.stockUtilization), 1);
+
+  const { grossProfitWeight, profitMarginWeight, avgTurnoverWeight, monthlyTurnoverWeight, stockUtilizationWeight } = constraints;
+  const totalWeight = grossProfitWeight + profitMarginWeight + avgTurnoverWeight + monthlyTurnoverWeight + stockUtilizationWeight || 1;
+  const wGP = grossProfitWeight / totalWeight;
+  const wPM = profitMarginWeight / totalWeight;
+  const wAW = avgTurnoverWeight / totalWeight;
+  const wMT = monthlyTurnoverWeight / totalWeight;
+  const wSU = stockUtilizationWeight / totalWeight;
+
+  const validResults: ComboResult[] = pendingResults.map(pending => {
+    const { rawMetrics } = pending;
+    const nGP = rawMetrics.grossProfit / maxGP;
+    const nPM = rawMetrics.profitMargin / maxPM;
+    const nAW = rawMetrics.avgWeight / maxAW;
+    const nMT = rawMetrics.monthlyTurnover / maxMT;
+    const nSU = rawMetrics.stockUtilization / maxSU;
+
+    const weightedScore = nGP * wGP + nPM * wPM + nAW * wAW + nMT * wMT + nSU * wSU;
+
+    return {
+      id: `combo-${pending.index}`,
+      rank: 0,
+      items: pending.items,
+      totalCost: Math.round(pending.totalCost * 100) / 100,
+      totalRevenue: Math.round(pending.totalRevenue * 100) / 100,
+      grossProfit: Math.round(pending.grossProfit * 100) / 100,
+      profitMargin: Math.round(pending.profitMargin * 10000) / 10000,
+      weightedScore: Math.round(weightedScore * 10000) / 100,
+      monthlyTurnover: pending.monthlyTurnover,
+      avgTurnoverWeight: Math.round(pending.avgWeight * 10) / 10,
+      totalStock: pending.totalStock,
+    };
+  });
 
   validResults.sort((a, b) => b.weightedScore - a.weightedScore);
   const topResults = validResults.slice(0, MAX_RESULTS).map((r, idx) => ({ ...r, rank: idx + 1 }));

@@ -1,4 +1,4 @@
-import { Sliders, Shield, Package, Users, Zap } from 'lucide-react';
+import { Sliders, Shield, Package, Users, Zap, DollarSign, Percent, TrendingUp, BarChart3, Boxes } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import SliderInput from '@/components/common/SliderInput';
 import NumberInput from '@/components/common/NumberInput';
@@ -6,6 +6,8 @@ import NumberInput from '@/components/common/NumberInput';
 export default function ConstraintsPanel() {
   const { activeModel, constraints, updateConstraints } = useAppStore();
   const c = constraints[activeModel];
+
+  const totalWeight = c.grossProfitWeight + c.profitMarginWeight + c.avgTurnoverWeight + c.monthlyTurnoverWeight + c.stockUtilizationWeight;
 
   return (
     <div className="glass-card p-5 space-y-5">
@@ -76,6 +78,83 @@ export default function ConstraintsPanel() {
         onChange={(e) => updateConstraints(activeModel, { globalStockLimit: Number(e.target.value) || 0 })}
         hint="设置 0 则不启用全局库存约束"
       />
+
+      <div className="border-t border-white/5 pt-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-violet-600/10 border border-violet-500/30 flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-violet-400" />
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-ink-100 text-sm">排序维度权重</h3>
+              <p className="text-[10px] text-ink-500">各维度归一化后按权重加权求和</p>
+            </div>
+          </div>
+          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${totalWeight === 100 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+            合计 {totalWeight}
+          </span>
+        </div>
+
+        <SliderInput
+          label="毛利金额权重"
+          icon={DollarSign}
+          value={c.grossProfitWeight}
+          min={0}
+          max={100}
+          step={1}
+          displayValue={`${c.grossProfitWeight}%`}
+          accent="amber"
+          onChange={(v) => updateConstraints(activeModel, { grossProfitWeight: v })}
+        />
+
+        <SliderInput
+          label="毛利率权重"
+          icon={Percent}
+          value={c.profitMarginWeight}
+          min={0}
+          max={100}
+          step={1}
+          displayValue={`${c.profitMarginWeight}%`}
+          accent="emerald"
+          onChange={(v) => updateConstraints(activeModel, { profitMarginWeight: v })}
+        />
+
+        <SliderInput
+          label="周转权重权重"
+          icon={TrendingUp}
+          value={c.avgTurnoverWeight}
+          min={0}
+          max={100}
+          step={1}
+          displayValue={`${c.avgTurnoverWeight}%`}
+          accent="rose"
+          onChange={(v) => updateConstraints(activeModel, { avgTurnoverWeight: v })}
+        />
+
+        <SliderInput
+          label="月度周转权重"
+          icon={Zap}
+          value={c.monthlyTurnoverWeight}
+          min={0}
+          max={100}
+          step={1}
+          displayValue={`${c.monthlyTurnoverWeight}%`}
+          accent="amber"
+          onChange={(v) => updateConstraints(activeModel, { monthlyTurnoverWeight: v })}
+        />
+
+        <SliderInput
+          label="库存利用率权重"
+          icon={Boxes}
+          value={c.stockUtilizationWeight}
+          min={0}
+          max={100}
+          step={1}
+          displayValue={`${c.stockUtilizationWeight}%`}
+          accent="emerald"
+          onChange={(v) => updateConstraints(activeModel, { stockUtilizationWeight: v })}
+        />
+      </div>
 
       <div className="p-3.5 rounded-xl bg-gradient-to-br from-ink-950/80 to-ink-900/40 border border-white/5 space-y-2">
         <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold text-ink-400">

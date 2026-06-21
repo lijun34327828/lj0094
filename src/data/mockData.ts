@@ -6,12 +6,22 @@ export const defaultConstraints: Record<ModelType, Constraints> = {
     minComboSize: 2,
     maxComboSize: 5,
     globalStockLimit: 5000,
+    grossProfitWeight: 50,
+    profitMarginWeight: 20,
+    avgTurnoverWeight: 15,
+    monthlyTurnoverWeight: 10,
+    stockUtilizationWeight: 5,
   },
   '3874': {
     minTurnoverWeight: 3,
     minComboSize: 2,
     maxComboSize: 5,
     globalStockLimit: 3000,
+    grossProfitWeight: 50,
+    profitMarginWeight: 20,
+    avgTurnoverWeight: 15,
+    monthlyTurnoverWeight: 10,
+    stockUtilizationWeight: 5,
   },
 };
 

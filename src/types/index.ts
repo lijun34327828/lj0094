@@ -15,6 +15,11 @@ export interface Constraints {
   minComboSize: number;
   maxComboSize: number;
   globalStockLimit: number;
+  grossProfitWeight: number;
+  profitMarginWeight: number;
+  avgTurnoverWeight: number;
+  monthlyTurnoverWeight: number;
+  stockUtilizationWeight: number;
 }
 
 export interface ComboItem {
