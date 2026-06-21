@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppState, Product, Constraints, ModelType, ComboResult, CalculationSummary } from '@/types';
+import type { AppState, Product, Constraints, ModelType, ComboResult, CalculationSummary, ParetoPoint, SensitivityResult, MultiSensitivityResult } from '@/types';
 import { initialProducts, defaultConstraints } from '@/data/mockData';
 import { generateId } from '@/utils/formatters';
 
@@ -9,8 +9,12 @@ export const useAppStore = create<AppState & {
   updateProduct: (id: string, patch: Partial<Product>) => void;
   removeProduct: (id: string) => void;
   updateConstraints: (model: ModelType, patch: Partial<Constraints>) => void;
-  setResults: (results: ComboResult[], summary: CalculationSummary | null) => void;
+  setCalcResult: (results: ComboResult[], allResults: ComboResult[], paretoFront: ParetoPoint[], summary: CalculationSummary | null) => void;
+  setSensitivityData: (data: SensitivityResult | null) => void;
+  setMultiSensitivityData: (data: MultiSensitivityResult | null) => void;
+  setSelectedComboId: (id: string | null) => void;
   setIsCalculating: (v: boolean) => void;
+  setIsSensitivityCalculating: (v: boolean) => void;
   getProductsByModel: (model: ModelType) => Product[];
   resetAll: () => void;
 }>((set, get) => ({
@@ -18,10 +22,21 @@ export const useAppStore = create<AppState & {
   activeModel: '8874',
   constraints: defaultConstraints,
   results: [],
+  allResults: [],
+  paretoFront: [],
+  sensitivityData: null,
+  multiSensitivityData: null,
+  selectedComboId: null,
   summary: null,
   isCalculating: false,
+  isSensitivityCalculating: false,
 
-  setActiveModel: (model) => set({ activeModel: model }),
+  setActiveModel: (model) => set({
+    activeModel: model,
+    selectedComboId: null,
+    sensitivityData: null,
+    multiSensitivityData: null,
+  }),
 
   addProduct: (product) => set((s) => ({
     products: [...s.products, { ...product, id: generateId('p') }],
@@ -42,9 +57,23 @@ export const useAppStore = create<AppState & {
     },
   })),
 
-  setResults: (results, summary) => set({ results, summary }),
+  setCalcResult: (results, allResults, paretoFront, summary) => set({
+    results, allResults, paretoFront, summary,
+  }),
+
+  setSensitivityData: (data) => set({ sensitivityData: data }),
+
+  setMultiSensitivityData: (data) => set({ multiSensitivityData: data }),
+
+  setSelectedComboId: (id) => set({
+    selectedComboId: id,
+    sensitivityData: null,
+    multiSensitivityData: null,
+  }),
 
   setIsCalculating: (v) => set({ isCalculating: v }),
+
+  setIsSensitivityCalculating: (v) => set({ isSensitivityCalculating: v }),
 
   getProductsByModel: (model) => get().products.filter(p => p.model === model),
 
@@ -52,6 +81,11 @@ export const useAppStore = create<AppState & {
     products: initialProducts,
     constraints: defaultConstraints,
     results: [],
+    allResults: [],
+    paretoFront: [],
+    sensitivityData: null,
+    multiSensitivityData: null,
+    selectedComboId: null,
     summary: null,
   }),
 }));

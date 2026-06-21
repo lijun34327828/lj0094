@@ -1,4 +1,4 @@
-import { Calculator, Filter, Sparkles, BarChart3, Clock, CheckCircle2 } from 'lucide-react';
+import { Calculator, Filter, Sparkles, BarChart3, Clock, CheckCircle2, Target } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import StatBadge from '@/components/common/StatBadge';
 
@@ -32,7 +32,7 @@ export default function SummaryCard() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <StatBadge
           label="遍历总组合"
           icon={Calculator}
@@ -58,10 +58,16 @@ export default function SummaryCard() {
           variant="positive"
         />
         <StatBadge
+          label="帕累托最优"
+          icon={Target}
+          value={summary?.paretoCount.toLocaleString() ?? '—'}
+          variant="highlight"
+        />
+        <StatBadge
           label="计算耗时"
           icon={Clock}
           value={summary?.calculateTimeMs ?? '—'}
-          variant="highlight"
+          variant="default"
           suffix="ms"
         />
       </div>

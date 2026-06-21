@@ -3,8 +3,12 @@ import { Trophy, Sparkles, Inbox, Loader2 } from 'lucide-react';
 import ComboCard from './ComboCard';
 
 export default function RankingList() {
-  const { results, isCalculating, summary, activeModel } = useAppStore();
+  const { results, isCalculating, summary, activeModel, selectedComboId, setSelectedComboId } = useAppStore();
   const topScore = results.length > 0 ? results[0].weightedScore : 1;
+
+  const handleSelect = (id: string) => {
+    setSelectedComboId(selectedComboId === id ? null : id);
+  };
 
   if (isCalculating) {
     return (
@@ -17,7 +21,7 @@ export default function RankingList() {
         </div>
         <h3 className="font-display font-bold text-ink-200 text-xl mb-2">AI 组合推演进行中</h3>
         <p className="text-sm text-ink-400">
-          正在遍历 AI-{activeModel} 全部商品组合，执行多约束过滤与加权排序...
+          正在遍历 AI-{activeModel} 全部商品组合，执行整数优化与帕累托前沿计算...
         </p>
         <div className="mt-8 max-w-sm mx-auto space-y-3">
           {[0, 1, 2].map((i) => (
@@ -87,7 +91,7 @@ export default function RankingList() {
               <Sparkles className="w-4 h-4 text-amber-400" />
             </h2>
             <p className="text-xs text-ink-500 mt-0.5">
-              TOP {results.length} · 按综合加权收益分降序排列 · 实时重算
+              TOP {results.length} · 整数优化配量 · 点击选中做敏感度分析
             </p>
           </div>
         </div>
@@ -104,6 +108,8 @@ export default function RankingList() {
             combo={combo}
             topScore={topScore}
             delay={idx * 60}
+            isSelected={selectedComboId === combo.id}
+            onSelect={handleSelect}
           />
         ))}
       </div>

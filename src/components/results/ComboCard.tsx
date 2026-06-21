@@ -1,4 +1,4 @@
-import { Trophy, TrendingUp, Boxes, CircleDollarSign, RefreshCw, Award } from 'lucide-react';
+import { Trophy, TrendingUp, Boxes, CircleDollarSign, RefreshCw, Award, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { ComboResult } from '@/types';
 import { formatCurrency, formatNumber, formatPercent } from '@/utils/formatters';
 
@@ -6,9 +6,11 @@ interface ComboCardProps {
   combo: ComboResult;
   topScore: number;
   delay?: number;
+  isSelected?: boolean;
+  onSelect?: (id: string) => void;
 }
 
-export default function ComboCard({ combo, topScore, delay = 0 }: ComboCardProps) {
+export default function ComboCard({ combo, topScore, delay = 0, isSelected = false, onSelect }: ComboCardProps) {
   const scorePercent = topScore > 0 ? Math.max(5, (combo.weightedScore / topScore) * 100) : 100;
 
   const rankClass =
@@ -21,14 +23,34 @@ export default function ComboCard({ combo, topScore, delay = 0 }: ComboCardProps
     combo.rank === 2 ? 'border-ink-400/30' :
     combo.rank === 3 ? 'border-orange-500/30' : 'border-white/5 hover:border-white/15';
 
+  const selectedClass = isSelected ? 'ring-2 ring-violet-500/60 shadow-[0_0_24px_-6px_rgba(139,92,246,0.4)]' : '';
+
+  const statusBadge = combo.optimizationStatus === 'multiple' ? (
+    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 text-[10px] font-mono font-bold border border-amber-500/20">
+      <AlertTriangle className="w-3 h-3" />
+      多解 ({combo.alternateSolutions})
+    </span>
+  ) : combo.optimizationStatus === 'no_feasible' ? (
+    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-400 text-[10px] font-mono font-bold border border-rose-500/20">
+      无可行解
+    </span>
+  ) : null;
+
   return (
     <div
-      className={`relative glass-card p-5 transition-all duration-300 hover:-translate-y-1 ${borderClass}`}
+      className={`relative glass-card p-5 transition-all duration-300 hover:-translate-y-1 cursor-pointer ${borderClass} ${selectedClass}`}
       style={{ animationDelay: `${delay}ms` }}
+      onClick={() => onSelect?.(combo.id)}
     >
       {combo.rank === 1 && (
         <div className="absolute -top-3 left-5 px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-500 to-amber-400 text-ink-950 text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-amber-500/30 flex items-center gap-1">
           <Award className="w-3 h-3" /> 最优方案
+        </div>
+      )}
+
+      {combo.isParetoOptimal && (
+        <div className="absolute -top-3 right-5 px-2 py-1 rounded-md bg-gradient-to-r from-violet-500 to-violet-400 text-ink-950 text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-violet-500/30 flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3" /> 帕累托
         </div>
       )}
 
@@ -46,6 +68,7 @@ export default function ComboCard({ combo, topScore, delay = 0 }: ComboCardProps
               <span className="font-mono text-xs font-bold text-amber-400">
                 综合得分 {formatNumber(combo.weightedScore, 1)}
               </span>
+              {statusBadge}
             </div>
           </div>
         </div>
@@ -99,7 +122,7 @@ export default function ComboCard({ combo, topScore, delay = 0 }: ComboCardProps
         <div className="flex items-center justify-between text-[11px] text-ink-400 font-medium uppercase tracking-wider">
           <span className="flex items-center gap-1.5">
             <TrendingUp className="w-3 h-3 text-amber-400" />
-            商品构成 · 周转配比
+            商品构成 · 最优配量
           </span>
           <span className="font-mono">
             平均权重 <span className="text-amber-400 font-bold">{formatNumber(combo.avgTurnoverWeight, 1)}</span>
@@ -162,6 +185,14 @@ export default function ComboCard({ combo, topScore, delay = 0 }: ComboCardProps
           </div>
         </div>
       </div>
+
+      {isSelected && (
+        <div className="mt-3 pt-3 border-t border-violet-500/20 text-center">
+          <span className="text-[10px] text-violet-400 font-mono uppercase tracking-wider">
+            ✓ 已选中 · 切换至敏感度分析查看
+          </span>
+        </div>
+      )}
     </div>
   );
 }

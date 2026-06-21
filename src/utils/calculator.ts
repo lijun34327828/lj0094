@@ -1,12 +1,9 @@
-import type { Product, Constraints, ComboResult, ComboItem, CalculationSummary } from '@/types';
-import { generateCombinations, gcdArray } from './combinatorics';
+import type { Product, Constraints, ComboResult, ComboItem, CalcOutput } from '@/types';
+import { generateCombinations } from './combinatorics';
+import { optimizeQuantities } from './optimizer';
+import { computeParetoFront } from './pareto';
 
-const MAX_RESULTS = 20;
-
-interface CalculateResult {
-  results: ComboResult[];
-  summary: CalculationSummary;
-}
+const MAX_DISPLAY = 20;
 
 interface ComboRawMetrics {
   grossProfit: number;
@@ -18,10 +15,24 @@ interface ComboRawMetrics {
 
 export function calculateCombinations(
   products: Product[],
-  constraints: Constraints
-): CalculateResult {
+  constraints: Constraints,
+): CalcOutput {
   const startTime = performance.now();
   const { minTurnoverWeight, minComboSize, maxComboSize, globalStockLimit } = constraints;
+
+  const {
+    grossProfitWeight, profitMarginWeight, avgTurnoverWeight,
+    monthlyTurnoverWeight, stockUtilizationWeight,
+  } = constraints;
+  const totalWeight = grossProfitWeight + profitMarginWeight + avgTurnoverWeight +
+    monthlyTurnoverWeight + stockUtilizationWeight || 1;
+  const wGP = grossProfitWeight / totalWeight;
+  const wPM = profitMarginWeight / totalWeight;
+  const wAW = avgTurnoverWeight / totalWeight;
+  const wMT = monthlyTurnoverWeight / totalWeight;
+  const wSU = stockUtilizationWeight / totalWeight;
+
+  const weightCoeffs = { wGP, wPM, wAW, wMT, wSU };
 
   const filteredByWeightInit = products.filter(p => p.turnoverWeight >= minTurnoverWeight);
   const allCombos = generateCombinations(filteredByWeightInit, minComboSize, maxComboSize);
@@ -41,6 +52,8 @@ export function calculateCombinations(
     avgWeight: number;
     totalStock: number;
     rawMetrics: ComboRawMetrics;
+    optimizationStatus: 'optimal' | 'no_feasible' | 'multiple';
+    alternateSolutions?: number;
   }
 
   const pendingResults: PendingResult[] = [];
@@ -55,26 +68,15 @@ export function calculateCombinations(
       continue;
     }
 
-    const weights = combo.map(p => p.turnoverWeight);
-    const g = Math.max(1, gcdArray(weights));
-    const ratios = weights.map(w => w / g);
-    const sumRatios = ratios.reduce((a, b) => a + b, 0);
-
-    let scaleFactor = Infinity;
-    for (let j = 0; j < combo.length; j++) {
-      const maxByStock = Math.floor(combo[j].stockLimit / ratios[j]);
-      if (maxByStock < scaleFactor) scaleFactor = maxByStock;
+    const opt = optimizeQuantities(combo, constraints, weightCoeffs);
+    if (opt.status === 'no_feasible') {
+      filteredByStock++;
+      continue;
     }
-    if (globalStockLimit > 0) {
-      const maxByGlobal = Math.floor(globalStockLimit / sumRatios);
-      if (maxByGlobal < scaleFactor) scaleFactor = maxByGlobal;
-    }
-
-    scaleFactor = Math.max(1, scaleFactor);
 
     const items: ComboItem[] = combo.map((p, j) => ({
       product: p,
-      quantity: ratios[j] * scaleFactor,
+      quantity: opt.quantities[j],
     }));
 
     const totalStock = items.reduce((s, it) => s + it.quantity, 0);
@@ -82,6 +84,7 @@ export function calculateCombinations(
       filteredByStock++;
       continue;
     }
+
     let stockExceeded = false;
     for (let j = 0; j < items.length; j++) {
       if (items[j].quantity > items[j].product.stockLimit) {
@@ -121,6 +124,8 @@ export function calculateCombinations(
         monthlyTurnover,
         stockUtilization,
       },
+      optimizationStatus: opt.status,
+      alternateSolutions: opt.alternateSolutions,
     });
   }
 
@@ -129,14 +134,6 @@ export function calculateCombinations(
   const maxAW = Math.max(...pendingResults.map(r => r.rawMetrics.avgWeight), 1);
   const maxMT = Math.max(...pendingResults.map(r => r.rawMetrics.monthlyTurnover), 1);
   const maxSU = Math.max(...pendingResults.map(r => r.rawMetrics.stockUtilization), 1);
-
-  const { grossProfitWeight, profitMarginWeight, avgTurnoverWeight, monthlyTurnoverWeight, stockUtilizationWeight } = constraints;
-  const totalWeight = grossProfitWeight + profitMarginWeight + avgTurnoverWeight + monthlyTurnoverWeight + stockUtilizationWeight || 1;
-  const wGP = grossProfitWeight / totalWeight;
-  const wPM = profitMarginWeight / totalWeight;
-  const wAW = avgTurnoverWeight / totalWeight;
-  const wMT = monthlyTurnoverWeight / totalWeight;
-  const wSU = stockUtilizationWeight / totalWeight;
 
   const validResults: ComboResult[] = pendingResults.map(pending => {
     const { rawMetrics } = pending;
@@ -160,21 +157,37 @@ export function calculateCombinations(
       monthlyTurnover: pending.monthlyTurnover,
       avgTurnoverWeight: Math.round(pending.avgWeight * 10) / 10,
       totalStock: pending.totalStock,
+      optimizationStatus: pending.optimizationStatus,
+      alternateSolutions: pending.alternateSolutions,
+      isParetoOptimal: false,
     };
   });
 
   validResults.sort((a, b) => b.weightedScore - a.weightedScore);
-  const topResults = validResults.slice(0, MAX_RESULTS).map((r, idx) => ({ ...r, rank: idx + 1 }));
+  const allRanked = validResults.map((r, idx) => ({ ...r, rank: idx + 1 }));
+
+  const paretoFront = computeParetoFront(allRanked);
+  const paretoIds = new Set(paretoFront.filter(p => p.isPareto).map(p => p.comboId));
+
+  const allWithPareto = allRanked.map(r => ({
+    ...r,
+    isParetoOptimal: paretoIds.has(r.id),
+  }));
+
+  const topResults = allWithPareto.slice(0, MAX_DISPLAY);
 
   const endTime = performance.now();
 
   return {
     results: topResults,
+    allResults: allWithPareto,
+    paretoFront,
     summary: {
       totalCombinations,
       filteredByStock,
       filteredByWeight,
       validCombinations: validResults.length,
+      paretoCount: paretoIds.size,
       calculateTimeMs: Math.round(endTime - startTime),
     },
   };
